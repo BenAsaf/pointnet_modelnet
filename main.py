@@ -36,31 +36,42 @@ def get_data(data_dir: str):
     global NUM_POINTS_TO_SAMPLE
 
     def read_OFF_file(path, y):
-        raw = tf.io.read_file(path)
-        # Remove the "OFF" and remove ' ' from beginning and end
-        raw = tf.strings.strip(tf.strings.substr(raw, 3, tf.strings.length(raw)))
-        raw = tf.strings.split(raw, '\n')
+        raw = tf.io.read_file(path)  # Read the data.
+
+        raw = tf.strings.substr(raw, 3, tf.strings.length(raw))  # Substring and remove the "OFF"
+        raw = tf.strings.strip(raw)  # Strip the extra spaces
+
+        raw = tf.strings.regex_replace(raw, r"#.*\n$", "\n")  # Remove comments
+        raw = tf.strings.split(raw, '\n')  # Split by lines.
+
         meta_data = tf.strings.to_number(input=tf.strings.split(raw[0], " "), out_type=tf.int32)
         num_verts, num_faces, num_edges = tf.split(meta_data, 3)
         num_verts = tf.reshape(num_verts, ())
         # num_faces = tf.reshape(num_faces, ())
-        # num_edges = tf.reshape(num_edges, ())
+        # num_edges = tf.reshape(num_edges, ())  # Irrelevant in 'OFF' format
 
         start_idx_of_verts = 1  # First line is "OFF" (we removed it), second line is: "num_verts num_faces num_edges"
         end_idx_of_verts = start_idx_of_verts + num_verts
         # start_idx_of_faces = end_idx_of_verts
         # end_idx_of_faces = start_idx_of_faces + num_faces
-        # start_idx_of_edges = end_idx_of_faces
-        # end_idx_of_edges = start_idx_of_edges + num_edges
+        # start_idx_of_edges = end_idx_of_faces  # Irrelevant in 'OFF' format
+        # end_idx_of_edges = start_idx_of_edges + num_edges  # Irrelevant in 'OFF' format
 
         vertices_raw = tf.strings.strip(raw[start_idx_of_verts:end_idx_of_verts])  # Remove extra spaces ' '
-        # faces_raw = tf.strings.strip(raw[end_idx_of_verts:end_idx_of_faces])
-        # edges_raw = tf.strings.strip(raw[start_idx_of_edges:end_idx_of_edges])
+        # faces_raw = tf.strings.strip(raw[start_idx_of_faces:end_idx_of_faces])
+        # edges_raw = tf.strings.strip(raw[start_idx_of_edges:end_idx_of_edges])  # Irrelevant in 'OFF' format
 
         points = tf.strings.to_number(tf.strings.split(vertices_raw, " "), out_type=tf.float32).to_tensor()
         points = points - tf.reduce_mean(points, axis=0, keepdims=True)
+
+        # faces = tf.strings.to_number(tf.strings.split(faces_raw, " "), out_type=tf.int32).to_tensor()
+        # _, faces = tf.split(faces, axis=1,
+        #                     num_or_size_splits=(1, 3))  # Discard the first column which describes how many points.
+
+        # edges = tf.strings.to_number(tf.strings.split(edges_raw, " "), out_type=tf.int32).to_tensor()  # Irrelevant in 'OFF' format
+
         if num_verts < NUM_POINTS_TO_SAMPLE:
-            _zeros = tf.zeros(shape=[NUM_POINTS_TO_SAMPLE-num_verts, 3], dtype=tf.float32)
+            _zeros = tf.zeros(shape=[NUM_POINTS_TO_SAMPLE - num_verts, 3], dtype=tf.float32)
             points = tf.concat((points, _zeros), axis=0)
             points = tf.random.shuffle(points)
         else:
